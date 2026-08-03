@@ -1,0 +1,21 @@
+# Build outputs
+/Debug/
+/Release/
+*.elf
+*.bin
+*.hex
+*.map
+*.o
+*.d
+*.su
+*.cyclomatic
+
+# IDE & Eclipse temporary files
+.settings/
+.launch
+.target
+*.log
+
+# OS metadata
+.DS_Store
+Thumbs.db
