@@ -25,6 +25,7 @@
 
 #define STM32F407xx
 #include "stm32f4xx.h"
+#include "spi.h"
 
 
 
@@ -70,8 +71,12 @@ int main(void)
 	USART2->CR1 &= ~((1U << 3) | (1U << 13));
 	USART2->CR1 |= ((1U << 3) | (1U << 13));
 
-	printf("System Boot OK! SystemCoreClock: %lu Hz\r\n", 16000000UL);
-	printf("Testing hex values: 0x%08X\r\n", 0xDEADBEEF);
+	printf("System Boot OK! SystemCoreClocks: %lu Hz\r\n", 16000000UL);
+
+	printf("1. Initializing SPI1...\r\n");
+	SPI1_Init();
+	printf("2. SPI1 Initialized Successfully!\r\n");
+
 	while (1){
 
 	}
