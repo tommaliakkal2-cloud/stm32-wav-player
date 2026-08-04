@@ -17,6 +17,7 @@
  */
 
 #include <stdint.h>
+#include<stdio.h>
 
 #if !defined(__SOFT_FP__) && defined(__ARM_FP)
   #warning "FPU is not initialized, but the project is compiling for an FPU. Please initialize the FPU before use."
@@ -24,6 +25,8 @@
 
 #define STM32F407xx
 #include "stm32f4xx.h"
+
+
 
 void USART2_SendChar(char c){
 	while (!(USART2->SR & (1U <<7 )));
@@ -33,6 +36,16 @@ void USART2_SendChar(char c){
 void USART2_SendString(char *str){
 	while (*str)
 		USART2_SendChar(*str++);
+}
+
+// Retarget stdio printf to USART2
+int _write(int file, char *ptr, int len)
+{
+    for (int i = 0; i < len; i++)
+    {
+        USART2_SendChar(ptr[i]);
+    }
+    return len;
 }
 
 int main(void)
@@ -57,8 +70,9 @@ int main(void)
 	USART2->CR1 &= ~((1U << 3) | (1U << 13));
 	USART2->CR1 |= ((1U << 3) | (1U << 13));
 
+	printf("System Boot OK! SystemCoreClock: %lu Hz\r\n", 16000000UL);
+	printf("Testing hex values: 0x%08X\r\n", 0xDEADBEEF);
 	while (1){
-		USART2_SendString("System Boot OK!\r\n");
 
 	}
 
