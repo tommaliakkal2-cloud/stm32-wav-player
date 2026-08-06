@@ -26,6 +26,7 @@
 #define STM32F407xx
 #include "stm32f4xx.h"
 #include "spi.h"
+#include "sd.h"
 
 
 
@@ -73,10 +74,8 @@ int main(void)
 
 	printf("System Boot OK! SystemCoreClocks: %lu Hz\r\n", 16000000UL);
 
-	printf("1. Initializing SPI1...\r\n");
 	SPI1_Init();
-	printf("2. SPI1 Initialized Successfully!\r\n");
-
+	SD_Init();
 	while (1){
 
 	}

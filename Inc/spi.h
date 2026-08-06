@@ -13,8 +13,8 @@
 #endif
 #include "stm32f4xx.h"
 
-#define SD_NSS_LOW() (GPIO->BSRR = (1U << 4 + 16)) //set CS low to start data transfer
-#define SD_NSS_HIGH() (GPIO->BSRR = (1U << 4 )) //set CS high to stop
+#define SD_NSS_LOW() (GPIOA->BSRR = (1U << 4 + 16)) //set CS low to start data transfer
+#define SD_NSS_HIGH() (GPIOA->BSRR = (1U << 4 )) //set CS high to stop
 
 void SPI1_Init(void);
 uint8_t SPI1_Transfer(uint8_t data);

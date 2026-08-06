@@ -7,8 +7,13 @@
 
 
 #include "spi.h"
+#include <stdint.h>
+#include<stdio.h>
 
 void SPI1_Init(void){
+
+
+	printf("1. Initializing SPI1...\r\n");
 
 	RCC->AHB1ENR |= (1U << 0); //enabling clock GPIOA, redundancy
 	RCC->APB2ENR |= (1U << 12);//enabling clock SP1
@@ -30,6 +35,7 @@ void SPI1_Init(void){
 	//remaining settings on default
 
 	SPI1->CR1 |= (1U << 6);//enable spi
+	printf("2. SPI1 Initialized Successfully!\r\n");
 
 }
 
