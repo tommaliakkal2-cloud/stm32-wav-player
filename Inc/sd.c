@@ -87,3 +87,36 @@ uint8_t SD_Init(void){
 
 }
 
+uint8_t SD_Write_Single_Block(uint8_t *buffer, uint32_t sector){
+
+	uint8_t response;
+	SD_NSS_LOW();
+	response = SD_SendCommand(CMD24, sector, 0xFF);//command for writing 512 block at "sector"
+	if (response != 0x00){//return if response not 0(loop in main till we get 0? or do while here?)
+		SD_NSS_HIGH();
+		SPI_Transfer(0xFF);
+		return 1;
+	}
+	SPI_Transfer(0xFE);//token to start block
+	for(int i = 0; i < 512; i++){//block transfer
+		SPI_Transfer(buffer[i]);
+	}
+	SPI_Transfer(0xFF);
+	SPI_Transfer(0XFF);
+
+	response = SPI_Transfer(0xFF);
+
+	if ((response & 0x1F) != (0x05)){//mask response with 11111 to check if equal to x05
+		SD_NSS_HIGH();//if not exit, error
+		SPI_Transfer(0xFF);
+		return 1;
+	}
+
+	do{
+		response = SPI_Transfer(0xFF);///poll till SD finishes writing
+	}while (response == 0x00);//0x00 response indicates busy
+
+	SD_NSS_HIGH();
+	SPI_Transfer(0xFF);
+	return  0;
+}
