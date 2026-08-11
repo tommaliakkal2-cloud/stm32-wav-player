@@ -74,6 +74,7 @@ uint8_t SD_Init(void){
 		printf("Response is %02X %02X %02X %02X %02X \r\n", response, b1,b2,b3,b4);
 	}
 	else{
+		printf("Error: CMD8 failed\r\n");
 		SD_NSS_HIGH();
 		SPI1_Transfer(0XFF);
 		return 1;
@@ -94,13 +95,13 @@ uint8_t SD_Init(void){
 	}while((response !=0x00) && tries < 1000);
 
 	if (response == 0x00){
-		printf("3. SD Card Initialized Succesfully!\r\n");
+		printf("SD Card Initialized Succesfully!\r\n");
 		SD_NSS_HIGH();
 		SPI1_Transfer(0XFF);
 		return 0;
 	}
 	else{
-		printf("3. SD Card Initialization failed!\r\n\r\n");
+		printf("SD Card Initialization failed!\r\n\r\n");
 		SD_NSS_HIGH();
 		SPI1_Transfer(0XFF);
 		return 1;
@@ -114,6 +115,7 @@ uint8_t SD_Write_Single_Block(uint8_t *buffer, uint32_t sector){
 	SD_NSS_LOW();
 	response = SD_SendCommand(CMD24, sector, 0xFF);//command for writing 512 block at "sector"
 	if (response != 0x00){//return if response not 0(loop in main till we get 0? or do while here?)
+		printf("Error: CMD24 failed\r\n");
 		SD_NSS_HIGH();
 		SPI1_Transfer(0xFF);
 		return 1;
@@ -130,6 +132,7 @@ uint8_t SD_Write_Single_Block(uint8_t *buffer, uint32_t sector){
 	response = SPI1_Transfer(0xFF);
 
 	if ((response & 0x1F) != (0x05)){//mask response with 11111 to check if equal to x05
+		printf("Error: Single_Block_Write failed\r\n");
 		SD_NSS_HIGH();//if not exit, error
 		SPI1_Transfer(0xFF);
 		return 1;
@@ -138,7 +141,7 @@ uint8_t SD_Write_Single_Block(uint8_t *buffer, uint32_t sector){
 	do{
 		response = SPI1_Transfer(0xFF);///poll till SD finishes writing
 	}while (response == 0x00);//0x00 response indicates busy
-
+	printf("Single_Block_Write done for sector : %u\r\n", sector);
 	SD_NSS_HIGH();
 	SPI1_Transfer(0xFF);
 	return  0;
@@ -151,6 +154,7 @@ uint8_t SD_Read_Single_Block(uint8_t *buffer, uint32_t sector){
 	SD_NSS_LOW();
 	response = SD_SendCommand(CMD17, sector, 0xFF);
 	if (response != 0x00){
+		printf("Error: CMD17 failed\r\n");
 		SD_NSS_HIGH();
 		SPI1_Transfer(0xFF);
 		return 1;
@@ -163,6 +167,7 @@ uint8_t SD_Read_Single_Block(uint8_t *buffer, uint32_t sector){
 	}while((response != 0xFE) && (tries < 0xFFFF));
 	if (tries >= 0xFFFF){
 
+		printf("Error: Single_Block_Read failed\r\n");
 		SD_NSS_HIGH();
 		SPI1_Transfer(0xFF);
 		return 1;
@@ -172,7 +177,7 @@ uint8_t SD_Read_Single_Block(uint8_t *buffer, uint32_t sector){
 	}
 	SPI1_Transfer(0xFF);
 	SPI1_Transfer(0xFF);
-
+	printf("Single_Block_Read done for sector : %u\r\n", sector);
 	SD_NSS_HIGH();
 	SPI1_Transfer(0xFF);
 	return 0;
