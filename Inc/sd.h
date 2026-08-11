@@ -20,5 +20,6 @@
 
 uint8_t SD_Init(void);
 uint8_t SD_SendCommand(uint8_t cmd,uint32_t arg,uint8_t crc);
-
+uint8_t SD_Write_Single_Block(uint8_t *buffer , uint32_t sector);
+uint8_t SD_Read_Single_Block(uint8_t *buffer , uint32_t sector);
 #endif /* SD_H_ */

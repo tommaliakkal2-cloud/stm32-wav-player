@@ -13,7 +13,7 @@ uint8_t SD_SendCommand(uint8_t cmd, uint32_t arg, uint8_t crc){
 	uint8_t response;//to store SD card response
 	uint8_t tries= 0;//to count number of tries of communication
 
-	SD_NSS_LOW();//signal to SPI device its being talked to
+	//SD_NSS_LOW();//signal to SPI device its being talked to
 	//6 btye command sending
 	SPI1_Transfer(cmd);
 	SPI1_Transfer((uint8_t)(arg >> 24));
@@ -27,9 +27,9 @@ uint8_t SD_SendCommand(uint8_t cmd, uint32_t arg, uint8_t crc){
 		tries++;
 	}while((response & 0x80) && (tries < 0xFF ) );//exits when reponse bti starts with 0 and tries less that 255
 
-	SD_NSS_HIGH();//CS pulled back high to signal command over
+	//SD_NSS_HIGH();//CS pulled back high to signal command over
 
-	SPI1_Transfer(0xFF);//to clear MISO line
+	//SPI1_Transfer(0xFF);//to clear MISO line
 
 	return (uint8_t)response;
 }
@@ -46,18 +46,24 @@ uint8_t SD_Init(void){
 		SPI1_Transfer(0xFF);
 	}
 	//reset and SPI mode command
+	SD_NSS_LOW();
 	response = SD_SendCommand(CMD0,0,0x95);
 	printf("CMD0 Response : 0x%02X\r\n", response);
 	if (response != 0x01){
 		printf("Error: CMD0 failed\r\n");
+		SD_NSS_HIGH();
+		SPI1_Transfer(0XFF);
 		return 1;
 	}
+	SD_NSS_HIGH();
+	SPI1_Transfer(0XFF);
 
+	SD_NSS_LOW();
 	//voltage check
 	response = SD_SendCommand(CMD8,0x000001AA,0x87);
 
 	if (response == 0x01){
-		SD_NSS_LOW();
+//		SD_NSS_LOW();
 		uint8_t b1= SPI1_Transfer(0xFF);
 		uint8_t b2= SPI1_Transfer(0xFF);
 		uint8_t b3= SPI1_Transfer(0xFF);
@@ -67,21 +73,36 @@ uint8_t SD_Init(void){
 
 		printf("Response is %02X %02X %02X %02X %02X \r\n", response, b1,b2,b3,b4);
 	}
-
+	else{
+		SD_NSS_HIGH();
+		SPI1_Transfer(0XFF);
+		return 1;
+	}
 	//
-
 	do{
+		SD_NSS_LOW();
 		SD_SendCommand(CMD55,0,0xFF);
+		SD_NSS_HIGH();
+		SPI1_Transfer(0XFF);
+		SD_NSS_LOW();
+
 		response = SD_SendCommand(ACMD41,0x40000000,0xFF);
 		tries++;
+		SD_NSS_HIGH();
+		SPI1_Transfer(0XFF);
+
 	}while((response !=0x00) && tries < 1000);
 
 	if (response == 0x00){
 		printf("3. SD Card Initialized Succesfully!\r\n");
+		SD_NSS_HIGH();
+		SPI1_Transfer(0XFF);
 		return 0;
 	}
 	else{
 		printf("3. SD Card Initialization failed!\r\n\r\n");
+		SD_NSS_HIGH();
+		SPI1_Transfer(0XFF);
 		return 1;
 	}
 
@@ -94,29 +115,65 @@ uint8_t SD_Write_Single_Block(uint8_t *buffer, uint32_t sector){
 	response = SD_SendCommand(CMD24, sector, 0xFF);//command for writing 512 block at "sector"
 	if (response != 0x00){//return if response not 0(loop in main till we get 0? or do while here?)
 		SD_NSS_HIGH();
-		SPI_Transfer(0xFF);
+		SPI1_Transfer(0xFF);
 		return 1;
 	}
-	SPI_Transfer(0xFE);//token to start block
-	for(int i = 0; i < 512; i++){//block transfer
-		SPI_Transfer(buffer[i]);
-	}
-	SPI_Transfer(0xFF);
-	SPI_Transfer(0XFF);
+	//SD_NSS_LOW();
 
-	response = SPI_Transfer(0xFF);
+	SPI1_Transfer(0xFE);//token to start block
+	for(int i = 0; i < 512; i++){//block transfer
+		SPI1_Transfer(buffer[i]);
+	}
+	SPI1_Transfer(0xFF);
+	SPI1_Transfer(0XFF);
+
+	response = SPI1_Transfer(0xFF);
 
 	if ((response & 0x1F) != (0x05)){//mask response with 11111 to check if equal to x05
 		SD_NSS_HIGH();//if not exit, error
-		SPI_Transfer(0xFF);
+		SPI1_Transfer(0xFF);
 		return 1;
 	}
 
 	do{
-		response = SPI_Transfer(0xFF);///poll till SD finishes writing
+		response = SPI1_Transfer(0xFF);///poll till SD finishes writing
 	}while (response == 0x00);//0x00 response indicates busy
 
 	SD_NSS_HIGH();
-	SPI_Transfer(0xFF);
+	SPI1_Transfer(0xFF);
 	return  0;
+}
+
+uint8_t SD_Read_Single_Block(uint8_t *buffer, uint32_t sector){
+
+	uint8_t response;
+	uint32_t tries= 0;
+	SD_NSS_LOW();
+	response = SD_SendCommand(CMD17, sector, 0xFF);
+	if (response != 0x00){
+		SD_NSS_HIGH();
+		SPI1_Transfer(0xFF);
+		return 1;
+	}
+	//SD_NSS_LOW();
+
+	do{
+		response = SPI1_Transfer(0xFF);
+		tries++;
+	}while((response != 0xFE) && (tries < 0xFFFF));
+	if (tries >= 0xFFFF){
+
+		SD_NSS_HIGH();
+		SPI1_Transfer(0xFF);
+		return 1;
+	}
+	for(int i = 0; i < 512 ; i++){
+		buffer[i] = SPI1_Transfer(0xFF);
+	}
+	SPI1_Transfer(0xFF);
+	SPI1_Transfer(0xFF);
+
+	SD_NSS_HIGH();
+	SPI1_Transfer(0xFF);
+	return 0;
 }
