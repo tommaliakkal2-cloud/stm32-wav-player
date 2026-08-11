@@ -15,8 +15,8 @@
 #define CMD8   (0x40 + 8)
 #define CMD55  (0x40 + 55)
 #define ACMD41 (0x40 + 41)
-#define CMD17  (0x40 + 51)
-#define CMD24  (0x40 + 58)
+#define CMD17  (0x40 + 17)
+#define CMD24  (0x40 + 24)
 
 uint8_t SD_Init(void);
 uint8_t SD_SendCommand(uint8_t cmd,uint32_t arg,uint8_t crc);

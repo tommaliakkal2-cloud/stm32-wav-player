@@ -110,7 +110,7 @@ uint8_t SD_Init(void){
 }
 
 uint8_t SD_Write_Single_Block(uint8_t *buffer, uint32_t sector){
-
+	printf("WriteBlock Sector %u.\r\n", sector);
 	uint8_t response;
 	SD_NSS_LOW();
 	response = SD_SendCommand(CMD24, sector, 0xFF);//command for writing 512 block at "sector"
@@ -120,8 +120,8 @@ uint8_t SD_Write_Single_Block(uint8_t *buffer, uint32_t sector){
 		SPI1_Transfer(0xFF);
 		return 1;
 	}
+	printf("CMD24 response correct : %02X.\r\n", response);
 	//SD_NSS_LOW();
-
 	SPI1_Transfer(0xFE);//token to start block
 	for(int i = 0; i < 512; i++){//block transfer
 		SPI1_Transfer(buffer[i]);
@@ -132,7 +132,7 @@ uint8_t SD_Write_Single_Block(uint8_t *buffer, uint32_t sector){
 	response = SPI1_Transfer(0xFF);
 
 	if ((response & 0x1F) != (0x05)){//mask response with 11111 to check if equal to x05
-		printf("Error: Single_Block_Write failed\r\n");
+		printf("Error: Single_Block_Write failed(Response: 0x%02X)\r\n", response);
 		SD_NSS_HIGH();//if not exit, error
 		SPI1_Transfer(0xFF);
 		return 1;
