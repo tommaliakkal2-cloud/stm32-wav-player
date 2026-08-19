@@ -13,7 +13,7 @@
 #endif
 #include "stm32f4xx.h"
 
-#define SD_NSS_LOW() (GPIOA->BSRR = (1U << 4 + 16)) //set CS low to start data transfer
+#define SD_NSS_LOW() (GPIOA->BSRR = (1U << (4 + 16))) //set CS low to start data transfer
 #define SD_NSS_HIGH() (GPIOA->BSRR = (1U << 4 )) //set CS high to stop
 
 void SPI1_Init(void);
