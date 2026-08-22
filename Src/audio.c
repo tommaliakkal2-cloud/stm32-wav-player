@@ -104,22 +104,83 @@ void I2C1_Init(){
 	I2C1->CCR |= 80;//scl clock
 	I2C1->TRISE |= 17;//max rise time
 
-	I2C1->CR1 |= I2C_CR1_PE ;//peripheral clock freq(16Mhz)
+	I2C1->CR1 |= I2C_CR1_PE ;//peripheral enable
 
 }
 
 void I2C1_Write(uint8_t reg_addr, uint8_t data){
-	while(I2C1->SR2 & I2C_SR2_BUSY);
-	I2C1->CR1 |= I2C_CR1_START;
-	while(!(I2C1->SR1 & I2C_SR1_SB));
-	I2C1->DR = 0x94;
-	while(!(I2C1->SR1 & I2C_SR1_ADDR));
-	(void)I2C1->SR1;
+	while(I2C1->SR2 & I2C_SR2_BUSY);//wait till not busy
+	I2C1->CR1 |= I2C_CR1_START;//start condition
+	while(!(I2C1->SR1 & I2C_SR1_SB));//wait till start bit 1
+	I2C1->DR = 0x94;//address of peripheral
+	while(!(I2C1->SR1 & I2C_SR1_ADDR));//wait till address match bit
+	(void)I2C1->SR1;//read SR1 and 2, part of sequence, required
 	(void)I2C1->SR2;
-	while(!(I2C1->SR1 & I2C_SR1_TXE));
+	while(!(I2C1->SR1 & I2C_SR1_TXE));//when transmit empty, send addr, then data
 	I2C1->DR = reg_addr;
 	while(!(I2C1->SR1 & I2C_SR1_TXE));
 	I2C1->DR = data;
-	while(!(I2C1->SR1 & I2C_SR1_BTF));
+	while(!(I2C1->SR1 & I2C_SR1_BTF));//wait till data transfer complere then stop condition
 	I2C1->CR1 |= I2C_CR1_STOP;
+}
+
+void CS43L22_Init(){
+
+	I2C1_Init();
+	I2C1_Write(0x02,0x01);//keep dac powered down while configuring
+	I2C1_Write(0x04,0xAF);//headphone on, speaker off.
+	I2C1_Write(0x05,0x80);//setting clock control to Auto
+	I2C1_Write(0x06,0x07);//settign mode as std I2S, 16bit length
+
+	//start up sequence
+	I2C1_Write(0x00, 0x99);
+	I2C1_Write(0x47, 0x80);
+	I2C1_Write(0x32, 0xBB);
+    I2C1_Write(0x32, 0x3B);
+	I2C1_Write(0x00, 0x00);
+
+	I2C1_Write(0x20, 0x00); // Master Volume A 0db
+	I2C1_Write(0x21, 0x00); // Master Volume B
+
+	I2C1_Write(0x22, 0xE0); // Headphone A Volume, very low for testing i dont want my eardrums to bleed.
+	I2C1_Write(0x23, 0xE0); // Headphone B Volume
+
+	I2C1_Write(0x02,0x9E);//power on DAC
+
+}
+
+void CS43L22_PinConfig(){
+	RCC->APB1ENR |= RCC_APB1ENR_SPI3EN;//i2s shares block with spi
+	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;//enabling gpioa again redundancy
+	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN;
+
+	GPIOA->MODER &= ~(3U << (4 * 2));
+	GPIOC->MODER &= ~((3U << (7 * 2)) | (3U << (10 * 2)) | (3U << (12 * 2)));
+
+	GPIOA->MODER |= (2U << (4 * 2));
+	GPIOC->MODER |= ((2U << (7 * 2)) | (2U << (10 * 2)) | (2U << (12 * 2)));
+
+	GPIOA->OSPEEDR |= (2U << (4 * 2));//speed high as clocks are high
+	GPIOC->OSPEEDR |= ((2U << (7 * 2)) | (2U << (10 * 2)) | (2U << (12 * 2)));
+
+	GPIOA->AFR[0] &= ~(0xFU << (4 * 4));
+	GPIOC->AFR[0] &= ~(0xFU << (7 * 4));
+	GPIOC->AFR[1] &= ~((0xFU << (2 * 4)) | (0xFU << (4 * 4)));
+
+	GPIOA->AFR[0] |= (6U << (4 * 4));
+	GPIOC->AFR[0] |= (6U << (7 * 4));
+	GPIOC->AFR[1] |= ((6U << (2 * 4)) | (6U << (4 * 4)));
+}
+
+void I2S3_Init(){
+	RCC->CR &= ~RCC_CR_PLLI2SON;
+	RCC->PLLI2SCFGR &= ~((0x1FFU << 6) | (7U << 28));
+	RCC->PLLI2SCFGR |= ((258U << 6) | (3U << 28));
+	RCC->CR |= RCC_CR_PLLI2SON;
+	while(!(RCC->CR & RCC_CR_PLLI2SRDY));
+	SPI3->I2SPR = (SPI_I2SPR_MCKOE | SPI_I2SPR_ODD | (3U << SPI_I2SPR_I2SDIV_Pos));
+	SPI3->I2SCFGR = 0;
+	SPI3->I2SCFGR |= (SPI_I2SCFGR_I2SMOD | (2U <<SPI_I2SCFGR_I2SCFG_Pos));
+	SPI3->I2SCFGR |= SPI_I2SCFGR_I2SE;
+
 }
