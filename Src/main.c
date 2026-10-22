@@ -41,6 +41,10 @@ void USART2_SendChar(char c){
 	USART2->DR = c;
 }
 
+char USART2_ReceiveChar(void){
+	while (!(USART2->SR & (1U <<5 )));
+	return (char)USART2->DR;
+}
 void USART2_SendString(char *str){
 	while (*str)
 		USART2_SendChar(*str++);
@@ -77,6 +81,9 @@ int main(void)
 	//enabling usart and transmitter
 	USART2->CR1 &= ~((1U << 3) | (1U << 13));
 	USART2->CR1 |= ((1U << 3) | (1U << 13));
+	//receiver
+	USART2->CR1 &= ~(1U << 2);
+	USART2->CR1 |= (1U << 2);
 
 	printf("System Boot OK! SystemCoreClocks: %lu Hz\r\n", 16000000UL);
 
@@ -101,7 +108,7 @@ int main(void)
 	}
 
 
-	uint8_t errors = 0;
+	uint16_t errors = 0;
 
 	for(int i = 0 ; i < 512 ; i++){
 		if(tx_buffer[i] != rx_buffer[i]){
@@ -114,8 +121,10 @@ int main(void)
 	else{
 		printf("Data matched! successfully.\r\n");
 	}
+	printf("Echo test: type something\r\n");
 	while (1){
-
+		char c = USART2_ReceiveChar();
+		USART2_SendChar(c+1);
 	}
 
 }
