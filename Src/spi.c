@@ -18,8 +18,11 @@ void SPI1_Init(void){
 	RCC->AHB1ENR |= (1U << 0); //enabling clock GPIOA, redundancy
 	RCC->APB2ENR |= (1U << 12);//enabling clock SP1
 
-	GPIOA->MODER &= ~(3U << (4 * 2));
-	GPIOA->MODER |= (1U << (4 * 2)); //setting as GP output, we need to manually control NSS/CS
+	//SD CS moved from PA4 to PB12 (PA4 is hardwired to CS43L22 I2S3_WS)
+	RCC->AHB1ENR |= (1U << 1);//enabling clock GPIOB
+	GPIOB->MODER &= ~(3U << (12 * 2));
+	GPIOB->MODER |= (1U << (12 * 2)); //setting PB12 as GP output, we need to manually control NSS/CS
+	GPIOB->BSRR = (1U << 12);//start with CS high (card not selected)
 
 	GPIOA->MODER &= ~((3U << (5 * 2)) | (3U<< (6 * 2)) | (3U<< (7 * 2)));//cleared and set pins5,6,7 as AF
 	GPIOA->MODER |= ((2U << (5 * 2)) | (2U<< (6 * 2)) | (2U<< (7 * 2)));
@@ -44,5 +47,15 @@ uint8_t SPI1_Transfer(uint8_t data){
 	SPI1->DR = data;
 	while (!(SPI1->SR & (1U << 0)));//wait till rx buffer full
 	return (uint8_t)SPI1->DR;
+
+}
+
+//after initialise we need to put it to hiigh speed for data transfer
+void SPI1_Set_Fast(void){
+	while (SPI1->SR & (1U << 7));
+	SPI1->CR1 &= ~SPI_CR1_SPE;
+	SPI1->CR1 &= ~SPI_CR1_BR;
+	SPI1->CR1 |= SPI_CR1_BR_0;
+	SPI1->CR1 |= SPI_CR1_SPE;
 
 }

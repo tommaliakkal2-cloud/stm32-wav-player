@@ -7,56 +7,6 @@
 
 #include "audio.h"
 
-const int16_t SINE_TABLE_1KHZ_48K[96] = {
-    0, 0,
-    1305, 1305,
-    2588, 2588,
-    3826, 3826,
-    5000, 5000,
-    6087, 6087,
-    7071, 7071,
-    7933, 7933,
-    8660, 8660,
-    9238, 9238,
-    9659, 9659,
-    9914, 9914,
-    10000, 10000,
-    9914, 9914,
-    9659, 9659,
-    9238, 9238,
-    8660, 8660,
-    7933, 7933,
-    7071, 7071,
-    6087, 6087,
-    5000, 5000,
-    3826, 3826,
-    2588, 2588,
-    1305, 1305,
-    0, 0,
-    -1305, -1305,
-    -2588, -2588,
-    -3826, -3826,
-    -5000, -5000,
-    -6087, -6087,
-    -7071, -7071,
-    -7933, -7933,
-    -8660, -8660,
-    -9238, -9238,
-    -9659, -9659,
-    -9914, -9914,
-    -10000, -10000,
-    -9914, -9914,
-    -9659, -9659,
-    -9238, -9238,
-    -8660, -8660,
-    -7933, -7933,
-    -7071, -7071,
-    -6087, -6087,
-    -5000, -5000,
-    -3826, -3826,
-    -2588, -2588,
-    -1305, -1305
-};
 
 
 void I2C1_Init(){
@@ -100,9 +50,9 @@ void I2C1_Init(){
 	I2C1->CR1 &= ~(I2C_CR1_SWRST);
 
 	//values are calculated using some equations
-	I2C1->CR2 |= 16;//peripheral clock freq(16Mhz)
-	I2C1->CCR |= 80;//scl clock
-	I2C1->TRISE |= 17;//max rise time
+	I2C1->CR2 = 16;//peripheral clock freq(16Mhz)
+	I2C1->CCR = 80;//scl clock
+	I2C1->TRISE = 17;//max rise time
 
 	I2C1->CR1 |= I2C_CR1_PE ;//peripheral enable
 
@@ -173,6 +123,7 @@ void CS43L22_PinConfig(){
 }
 
 void I2S3_Init(){
+	CS43L22_PinConfig();
 	RCC->CR &= ~RCC_CR_PLLI2SON;
 	RCC->PLLI2SCFGR &= ~((0x1FFU << 6) | (7U << 28));
 	RCC->PLLI2SCFGR |= ((258U << 6) | (3U << 28));
@@ -182,5 +133,9 @@ void I2S3_Init(){
 	SPI3->I2SCFGR = 0;
 	SPI3->I2SCFGR |= (SPI_I2SCFGR_I2SMOD | (2U <<SPI_I2SCFGR_I2SCFG_Pos));
 	SPI3->I2SCFGR |= SPI_I2SCFGR_I2SE;
+	CS43L22_Init();
 
 }
+
+
+

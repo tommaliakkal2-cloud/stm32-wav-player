@@ -110,17 +110,14 @@ uint8_t SD_Init(void){
 }
 
 uint8_t SD_Write_Single_Block(uint8_t *buffer, uint32_t sector){
-	printf("WriteBlock Sector %u.\r\n", sector);
 	uint8_t response;
 	SD_NSS_LOW();
 	response = SD_SendCommand(CMD24, sector, 0xFF);//command for writing 512 block at "sector"
 	if (response != 0x00){//return if response not 0(loop in main till we get 0? or do while here?)
-		printf("Error: CMD24 failed\r\n");
 		SD_NSS_HIGH();
 		SPI1_Transfer(0xFF);
 		return 1;
 	}
-	printf("CMD24 response correct : %02X.\r\n", response);
 	//SD_NSS_LOW();
 	SPI1_Transfer(0xFE);//token to start block
 	for(int i = 0; i < 512; i++){//block transfer
@@ -132,7 +129,6 @@ uint8_t SD_Write_Single_Block(uint8_t *buffer, uint32_t sector){
 	response = SPI1_Transfer(0xFF);
 
 	if ((response & 0x1F) != (0x05)){//mask response with 11111 to check if equal to x05
-		printf("Error: Single_Block_Write failed(Response: 0x%02X)\r\n", response);
 		SD_NSS_HIGH();//if not exit, error
 		SPI1_Transfer(0xFF);
 		return 1;
@@ -141,7 +137,6 @@ uint8_t SD_Write_Single_Block(uint8_t *buffer, uint32_t sector){
 	do{
 		response = SPI1_Transfer(0xFF);///poll till SD finishes writing
 	}while (response == 0x00);//0x00 response indicates busy
-	printf("Single_Block_Write done for sector : %u\r\n", sector);
 	SD_NSS_HIGH();
 	SPI1_Transfer(0xFF);
 	return  0;
@@ -154,7 +149,6 @@ uint8_t SD_Read_Single_Block(uint8_t *buffer, uint32_t sector){
 	SD_NSS_LOW();
 	response = SD_SendCommand(CMD17, sector, 0xFF);
 	if (response != 0x00){
-		printf("Error: CMD17 failed\r\n");
 		SD_NSS_HIGH();
 		SPI1_Transfer(0xFF);
 		return 1;
@@ -167,7 +161,6 @@ uint8_t SD_Read_Single_Block(uint8_t *buffer, uint32_t sector){
 	}while((response != 0xFE) && (tries < 0xFFFF));
 	if (tries >= 0xFFFF){
 
-		printf("Error: Single_Block_Read failed\r\n");
 		SD_NSS_HIGH();
 		SPI1_Transfer(0xFF);
 		return 1;
@@ -177,7 +170,6 @@ uint8_t SD_Read_Single_Block(uint8_t *buffer, uint32_t sector){
 	}
 	SPI1_Transfer(0xFF);
 	SPI1_Transfer(0xFF);
-	printf("Single_Block_Read done for sector : %u\r\n", sector);
 	SD_NSS_HIGH();
 	SPI1_Transfer(0xFF);
 	return 0;

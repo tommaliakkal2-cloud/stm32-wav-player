@@ -14,5 +14,11 @@
 #include "stm32f4xx.h"
 
 extern const int16_t SINE_TABLE_1KHZ_48K[96];
+void I2C1_Init();
+void I2C1_Write(uint8_t reg_addr, uint8_t data);
+void CS43L22_Init();
+void CS43L22_PinConfig();
+void I2S3_Init();
+void Audio_Play(void);
 
 #endif /* AUDIO_H_ */

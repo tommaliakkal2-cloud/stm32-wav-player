@@ -16,6 +16,7 @@
  ******************************************************************************
  */
 
+
 #include <stdint.h>
 #include<stdio.h>
 #include<string.h>
@@ -28,6 +29,7 @@
 #include "stm32f4xx.h"
 #include "spi.h"
 #include "sd.h"
+#include "audio.h"
 
 uint8_t tx_buffer[512];
 uint8_t rx_buffer[512];
@@ -83,15 +85,18 @@ int main(void)
 		while(1);
 	}
 
+	SPI1_Set_Fast();
+	I2S3_Init();
+
 	for(int i = 0; i < 512 ; i++){
 		tx_buffer[i] = (uint8_t)(i & 0xFF);
 	}
 	memset(rx_buffer, 0, 512);
 
-	if (SD_Write_Single_Block(tx_buffer, 2048) != 0){
+	if (SD_Write_Single_Block(tx_buffer, 500) != 0){
 		while(1);
 	}
-	if (SD_Read_Single_Block(rx_buffer, 2048) != 0){
+	if (SD_Read_Single_Block(rx_buffer, 500) != 0){
 		while(1);
 	}
 
