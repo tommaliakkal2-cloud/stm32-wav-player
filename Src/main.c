@@ -95,6 +95,7 @@ int main(void)
 	SPI1_Set_Fast();
 	I2S3_Init();
 
+	/*
 	for(int i = 0; i < 512 ; i++){
 		tx_buffer[i] = (uint8_t)(i & 0xFF);
 	}
@@ -121,10 +122,12 @@ int main(void)
 	else{
 		printf("Data matched! successfully.\r\n");
 	}
+
+
 	printf("Echo test: type something\r\n");
+	*/
 	while (1){
-		char c = USART2_ReceiveChar();
-		USART2_SendChar(c+1);
+
 	}
 
 }
