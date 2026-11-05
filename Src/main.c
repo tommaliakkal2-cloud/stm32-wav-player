@@ -169,7 +169,7 @@ int main(void)
 	printf("Data Starts @: %lu\r\n", data_start);
 	printf("Root Cluster: %lu\r\n", root_cluster);
 
-	uint32_t root_sector = data_start + (root_cluster − 2) * sectors_per_cluster;
+	uint32_t root_sector = data_start + (root_cluster - 2) * sectors_per_cluster;
 
 
 	while (1){
