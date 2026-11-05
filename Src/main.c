@@ -126,8 +126,52 @@ int main(void)
 
 	printf("Echo test: type something\r\n");
 	*/
-	while (1){
-
+	// 1. read sector 0 from the card into rx_buffer
+	if (SD_Read_Single_Block(rx_buffer, 0) != 0){
+	    while(1);
 	}
+	// 2. pull values out of the bytes we just read
+	uint32_t part_start = (uint32_t)rx_buffer[454]
+	                    | ((uint32_t)rx_buffer[455] << 8)
+	                    | ((uint32_t)rx_buffer[456] << 16)
+	                    | ((uint32_t)rx_buffer[457] << 24);
 
+	printf("Partition Start : %lu\r\n", part_start);
+
+	if (SD_Read_Single_Block(rx_buffer, part_start) != 0){
+			    while(1);
+			}
+	uint16_t bytes_per_sector = (uint16_t)rx_buffer[11] | ((uint16_t)rx_buffer[12] << 8) ; //11,12 are the bytes per sector info
+	uint16_t sectors_per_cluster = (uint16_t)rx_buffer[13];
+
+	uint16_t reserved_sectors = (uint16_t)rx_buffer[14] | ((uint16_t)rx_buffer[15] << 8) ; //similarly 14,15 for reserved etc and so on
+	uint16_t num_fats = (uint16_t)rx_buffer[16];
+	uint32_t sectors_per_fats = (uint32_t)rx_buffer[36] | ((uint32_t)rx_buffer[37] << 8)
+                				| ((uint32_t)rx_buffer[38] << 16)
+								| ((uint32_t)rx_buffer[39] << 24);
+
+
+	uint32_t root_cluster = (uint32_t)rx_buffer[44]
+	                      | ((uint32_t)rx_buffer[45] << 8)
+	                      | ((uint32_t)rx_buffer[46] << 16)
+	                      | ((uint32_t)rx_buffer[47] << 24);
+
+	printf("Bytes Per Sector : %u\r\n", bytes_per_sector);
+	printf("Sectors_Per_Cluster : %u\r\n", sectors_per_cluster);
+	printf("Reserved Sectors : %u\r\n", reserved_sectors);
+	printf("Number of FAT cluster maps : %u\r\n", num_fats);
+	printf("Sectors Per FAT : %lu\r\n", sectors_per_fats);
+
+
+	uint32_t fat_start = part_start + reserved_sectors;
+	uint32_t data_start = fat_start + (num_fats * sectors_per_fats);
+
+	printf("Data Starts @: %lu\r\n", data_start);
+	printf("Root Cluster: %lu\r\n", root_cluster);
+
+	uint32_t root_sector = data_start + (root_cluster − 2) * sectors_per_cluster;
+
+
+	while (1){
+	}
 }
