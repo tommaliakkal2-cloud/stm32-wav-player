@@ -172,6 +172,50 @@ int main(void)
 	uint32_t root_sector = data_start + (root_cluster - 2) * sectors_per_cluster;
 
 
+	if (SD_Read_Single_Block(rx_buffer, root_sector) != 0){
+				    while(1);
+				}
+	/*for(int i = 0; i < 16 ;i++ ){
+		uint8_t *card = &rx_buffer[32 * i];
+		printf("Card Start Byte: %X", card[0]);
+
+		if (card[0] == 0x00){
+			printf("Card Start Byte: %X", card[0]);
+			break;
+		}
+		printf("Card:%d | First Byte:%X | Name: %s | Attribute: %u", card, card[0], (char *)card, card[11]);
+	}
+	*/
+	for (int i = 0; i < 16; i++){
+	    uint8_t *card = &rx_buffer[32 * i];
+
+	    if (card[0] == 0x00){//card[0] is a way to go through the addresses, eg: card[1] here means card address + 1 byte | also if card[0] = 0 then that means empty ard, skip
+	        break;
+	    }
+	    printf("Card:%d | First Byte:%X | Name: %.11s | Attribute: 0x%02X\r\n",
+	           i, card[0], (char *)card, card[11]);
+		if (memcmp(card, "TRACK01 WAV", 11) == 0){
+			uint16_t hi = (uint16_t)card[21] << 8 | (uint16_t)card[20];
+			uint16_t lo = (uint16_t)card[27] << 8 | (uint16_t)card[26];
+			uint32_t cluster_number = (uint32_t)hi << 16 | (uint32_t) lo;
+			printf("Track 01 found @ cluster %lu\r\n", cluster_number);
+			uint32_t sector = data_start + (cluster_number - 2) * sectors_per_cluster;
+			printf("Track 01 starts @ Sector %lu\r\n", sector);
+			if (SD_Read_Single_Block(rx_buffer, sector) != 0){
+						    while(1);
+						}
+			printf("Byte 0-3 is: %.4s\r\n", (char *)rx_buffer);//this is just a test, get rid of it
+
+		}
+		if (memcmp(card, "TRACK02 WAV", 11) == 0){
+			uint16_t hi = (uint16_t)card[21] << 8 | (uint16_t)card[20];
+			uint16_t lo = (uint16_t)card[27] << 8 | (uint16_t)card[26];
+			uint32_t cluster_number = (uint32_t)hi << 16 | (uint32_t) lo;
+			printf("Track 02 found @ cluster %lu\r\n", cluster_number);
+		}
+	}
+
+
 	while (1){
 	}
 }
