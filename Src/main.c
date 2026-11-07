@@ -36,7 +36,12 @@ uint8_t rx_buffer[512];
 
 uint8_t root_dir_buffer[512];
 uint8_t song_sector_buffer[512];
+uint8_t FAT_sector_buffer[512];
 
+uint32_t fat_start;
+
+uint32_t current_cluster;
+uint32_t next_cluster;
 
 
 void USART2_SendChar(char c){
@@ -63,11 +68,33 @@ int _write(int file, char *ptr, int len)
     return len;
 }
 
+//read a 2-byte little-endian number starting at the given address
 uint16_t read16(uint8_t *buffer){
-	uint16_t result = (uint16_t)buffer[0] | ((uint16_t)buffer[1] << 8) ;
-	return result;
-
+	return (uint16_t)buffer[0] | ((uint16_t)buffer[1] << 8);
 }
+
+//read a 4-byte little-endian number starting at the given address
+uint32_t read32(uint8_t *buffer){
+	return (uint32_t)buffer[0]
+	     | ((uint32_t)buffer[1] << 8)
+	     | ((uint32_t)buffer[2] << 16)
+	     | ((uint32_t)buffer[3] << 24);
+}
+
+uint32_t fat_next_cluster(uint32_t cluster){
+
+	uint32_t fat_sector = fat_start + cluster/128;//to find which sector of FAT the current cluster lies in, ie which page
+	uint32_t sector_pos = (cluster % 128) * 4; //get remainder and then multiply with 4 bytes, cause each entry takes 4 bytes, ie which line in page
+
+	 if (SD_Read_Single_Block(FAT_sector_buffer, fat_sector) != 0){
+	        printf("FAT read error\r\n");
+	        return 0x0FFFFFFF;          // treat an error as "end", so the loop stops
+	    }
+	    return read32(&FAT_sector_buffer[sector_pos]) & 0x0FFFFFFF;  // the next cluster is recorded here
+	}
+
+
+
 
 int main(void)
 {
@@ -140,31 +167,19 @@ int main(void)
 	    while(1);
 	}
 	// 2. pull values out of the bytes we just read
-	uint32_t part_start = (uint32_t)rx_buffer[454]
-	                    | ((uint32_t)rx_buffer[455] << 8)
-	                    | ((uint32_t)rx_buffer[456] << 16)
-	                    | ((uint32_t)rx_buffer[457] << 24);
+	uint32_t part_start = read32(&rx_buffer[454]);
 
 	printf("Partition Start : %lu\r\n", part_start);
 
 	if (SD_Read_Single_Block(rx_buffer, part_start) != 0){
 			    while(1);
 			}
-	//uint16_t bytes_per_sector = (uint16_t)rx_buffer[11] | ((uint16_t)rx_buffer[12] << 8) ; //11,12 are the bytes per sector info
-	uint16_t bytes_per_sector = read16(&rx_buffer[11]);
-	uint16_t sectors_per_cluster = (uint16_t)rx_buffer[13];
-
-	uint16_t reserved_sectors = (uint16_t)rx_buffer[14] | ((uint16_t)rx_buffer[15] << 8) ; //similarly 14,15 for reserved etc and so on
-	uint16_t num_fats = (uint16_t)rx_buffer[16];
-	uint32_t sectors_per_fats = (uint32_t)rx_buffer[36] | ((uint32_t)rx_buffer[37] << 8)
-                				| ((uint32_t)rx_buffer[38] << 16)
-								| ((uint32_t)rx_buffer[39] << 24);
-
-
-	uint32_t root_cluster = (uint32_t)rx_buffer[44]
-	                      | ((uint32_t)rx_buffer[45] << 8)
-	                      | ((uint32_t)rx_buffer[46] << 16)
-	                      | ((uint32_t)rx_buffer[47] << 24);
+	uint16_t bytes_per_sector    = read16(&rx_buffer[11]);  //bytes 11-12
+	uint16_t sectors_per_cluster = rx_buffer[13];           //1 byte, no helper needed
+	uint16_t reserved_sectors    = read16(&rx_buffer[14]);  //bytes 14-15
+	uint16_t num_fats            = rx_buffer[16];           //1 byte
+	uint32_t sectors_per_fats    = read32(&rx_buffer[36]);  //bytes 36-39
+	uint32_t root_cluster        = read32(&rx_buffer[44]);  //bytes 44-47
 
 	printf("Bytes Per Sector : %u\r\n", bytes_per_sector);
 	printf("Sectors_Per_Cluster : %u\r\n", sectors_per_cluster);
@@ -173,7 +188,7 @@ int main(void)
 	printf("Sectors Per FAT : %lu\r\n", sectors_per_fats);
 
 
-	uint32_t fat_start = part_start + reserved_sectors;
+	fat_start = part_start + reserved_sectors;
 	uint32_t data_start = fat_start + (num_fats * sectors_per_fats);
 
 	printf("Data Starts @: %lu\r\n", data_start);
@@ -195,9 +210,9 @@ int main(void)
 	    printf("Card:%d | First Byte:%X | Name: %.11s | Attribute: 0x%02X\r\n",
 	           i, card[0], (char *)card, card[11]);
 		if (memcmp(card, "TRACK01 WAV", 11) == 0){
-			uint16_t hi = (uint16_t)card[21] << 8 | (uint16_t)card[20];
-			uint16_t lo = (uint16_t)card[27] << 8 | (uint16_t)card[26];
-			uint32_t cluster_number = (uint32_t)hi << 16 | (uint32_t) lo;
+			uint16_t hi = read16(&card[20]);  //high half of first cluster
+			uint16_t lo = read16(&card[26]);  //low half of first cluster
+			uint32_t cluster_number = ((uint32_t)hi << 16) | lo;
 			printf("Track 01 found @ cluster %lu\r\n", cluster_number);
 			uint32_t sector = data_start + (cluster_number - 2) * sectors_per_cluster;
 			printf("Track 01 starts @ Sector %lu\r\n", sector);
@@ -205,16 +220,33 @@ int main(void)
 						    while(1);
 						}
 			printf("Byte 0-3 is: %.4s\r\n", (char *)song_sector_buffer);//this is just a test, get rid of it
+			printf("Format: %.4s\r\n", (char *)&song_sector_buffer[8]);
+			printf("Audio Format(1 means uncompressed): %i\r\n", read16(&song_sector_buffer[20]));
+			printf("No: of Channels(1- mono, 2- stereo): %i\r\n", read16(&song_sector_buffer[22]));
+			printf("Sample Rate: %lu\r\n", read32(&song_sector_buffer[24]));
+			printf("Bit Per Sample: %i\r\n",read16(&song_sector_buffer[34]));
+			printf("Data Size: %lu\r\n",read32(&song_sector_buffer[40]));
+
+			printf("Data Size read from cards: %lu\r\n",read32(&card[28]));
+			printf("File size from WAV Header: %lu\r\n",read32(&song_sector_buffer[4]));
+
+			current_cluster = cluster_number;
+			uint32_t count = 0;
+			while(current_cluster < 0x0FFFFFF8){//either not reached end of a chain or no error
+				next_cluster = fat_next_cluster(current_cluster);
+				count++;
+				current_cluster = next_cluster;
+			}
+			printf("TRACK01 WAV uses %lu clusters\r\n", count);
 
 
 		}
-		if (memcmp(card, "TRACK02 WAV", 11) == 0){
-			uint16_t hi = (uint16_t)card[21] << 8 | (uint16_t)card[20];
-			uint16_t lo = (uint16_t)card[27] << 8 | (uint16_t)card[26];
-
-			uint32_t cluster_number = (uint32_t)hi << 16 | (uint32_t) lo;
+		/*if (memcmp(card, "TRACK02 WAV", 11) == 0){
+			uint16_t hi = read16(&card[20]);
+			uint16_t lo = read16(&card[26]);
+			uint32_t cluster_number = ((uint32_t)hi << 16) | lo;
 			printf("Track 02 found @ cluster %lu\r\n", cluster_number);
-		}
+		}*/
 	}
 
 
