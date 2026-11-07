@@ -31,8 +31,11 @@
 #include "sd.h"
 #include "audio.h"
 
-uint8_t tx_buffer[512];
+uint8_t tx_buffer[512];//can delete this, not needed
 uint8_t rx_buffer[512];
+
+uint8_t root_dir_buffer[512];
+uint8_t song_sector_buffer[512];
 
 
 
@@ -58,6 +61,12 @@ int _write(int file, char *ptr, int len)
         USART2_SendChar(ptr[i]);
     }
     return len;
+}
+
+uint16_t read16(uint8_t *buffer){
+	uint16_t result = (uint16_t)buffer[0] | ((uint16_t)buffer[1] << 8) ;
+	return result;
+
 }
 
 int main(void)
@@ -141,7 +150,8 @@ int main(void)
 	if (SD_Read_Single_Block(rx_buffer, part_start) != 0){
 			    while(1);
 			}
-	uint16_t bytes_per_sector = (uint16_t)rx_buffer[11] | ((uint16_t)rx_buffer[12] << 8) ; //11,12 are the bytes per sector info
+	//uint16_t bytes_per_sector = (uint16_t)rx_buffer[11] | ((uint16_t)rx_buffer[12] << 8) ; //11,12 are the bytes per sector info
+	uint16_t bytes_per_sector = read16(&rx_buffer[11]);
 	uint16_t sectors_per_cluster = (uint16_t)rx_buffer[13];
 
 	uint16_t reserved_sectors = (uint16_t)rx_buffer[14] | ((uint16_t)rx_buffer[15] << 8) ; //similarly 14,15 for reserved etc and so on
@@ -172,22 +182,12 @@ int main(void)
 	uint32_t root_sector = data_start + (root_cluster - 2) * sectors_per_cluster;
 
 
-	if (SD_Read_Single_Block(rx_buffer, root_sector) != 0){
+	if (SD_Read_Single_Block(root_dir_buffer, root_sector) != 0){
 				    while(1);
 				}
-	/*for(int i = 0; i < 16 ;i++ ){
-		uint8_t *card = &rx_buffer[32 * i];
-		printf("Card Start Byte: %X", card[0]);
 
-		if (card[0] == 0x00){
-			printf("Card Start Byte: %X", card[0]);
-			break;
-		}
-		printf("Card:%d | First Byte:%X | Name: %s | Attribute: %u", card, card[0], (char *)card, card[11]);
-	}
-	*/
 	for (int i = 0; i < 16; i++){
-	    uint8_t *card = &rx_buffer[32 * i];
+	    uint8_t *card = &root_dir_buffer[32 * i];
 
 	    if (card[0] == 0x00){//card[0] is a way to go through the addresses, eg: card[1] here means card address + 1 byte | also if card[0] = 0 then that means empty ard, skip
 	        break;
@@ -201,15 +201,17 @@ int main(void)
 			printf("Track 01 found @ cluster %lu\r\n", cluster_number);
 			uint32_t sector = data_start + (cluster_number - 2) * sectors_per_cluster;
 			printf("Track 01 starts @ Sector %lu\r\n", sector);
-			if (SD_Read_Single_Block(rx_buffer, sector) != 0){
+			if (SD_Read_Single_Block(song_sector_buffer, sector) != 0){
 						    while(1);
 						}
-			printf("Byte 0-3 is: %.4s\r\n", (char *)rx_buffer);//this is just a test, get rid of it
+			printf("Byte 0-3 is: %.4s\r\n", (char *)song_sector_buffer);//this is just a test, get rid of it
+
 
 		}
 		if (memcmp(card, "TRACK02 WAV", 11) == 0){
 			uint16_t hi = (uint16_t)card[21] << 8 | (uint16_t)card[20];
 			uint16_t lo = (uint16_t)card[27] << 8 | (uint16_t)card[26];
+
 			uint32_t cluster_number = (uint32_t)hi << 16 | (uint32_t) lo;
 			printf("Track 02 found @ cluster %lu\r\n", cluster_number);
 		}
