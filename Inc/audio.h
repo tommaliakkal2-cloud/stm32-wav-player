@@ -19,6 +19,6 @@ void I2C1_Write(uint8_t reg_addr, uint8_t data);
 void CS43L22_Init();
 void CS43L22_PinConfig();
 void I2S3_Init();
-void Audio_Play(void);
+void Audio_DMA_Start(int16_t *buf, uint16_t count);
 
 #endif /* AUDIO_H_ */

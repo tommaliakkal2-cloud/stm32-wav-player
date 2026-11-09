@@ -152,5 +152,35 @@ void I2S3_Init(){
 
 }
 
+void Audio_DMA_Start(int16_t *buf, uint16_t count){
+	// 1. power on DMA1
+	RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN;
 
+	// 2. stop the stream and wait until it has really stopped
+	DMA1_Stream5->CR &= ~DMA_SxCR_EN;
+	while (DMA1_Stream5->CR & DMA_SxCR_EN);
+
+	// 3. where the samples go: I2S3's data register
+	DMA1_Stream5->PAR = (uint32_t)&SPI3->DR;
+
+	// 4. where the samples come from: our buffer
+	DMA1_Stream5->M0AR = (uint32_t)buf;
+
+	// 5. how many 16-bit samples are in the buffer
+	DMA1_Stream5->NDTR = count;
+
+	// 6. settings (written with = so every other bit, including CHSEL, is 0 = channel 0)
+	DMA1_Stream5->CR = DMA_SxCR_DIR_0      // memory -> peripheral
+	                 | DMA_SxCR_MINC       // step through the buffer
+	                 | DMA_SxCR_CIRC       // loop back to the top at the end
+	                 | DMA_SxCR_MSIZE_0    // memory items are 16-bit
+	                 | DMA_SxCR_PSIZE_0    // peripheral items are 16-bit
+	                 | DMA_SxCR_PL_1;      // high priority
+
+	// 7. start the stream
+	DMA1_Stream5->CR |= DMA_SxCR_EN;
+
+	// 8. let I2S3 request samples from DMA
+	SPI3->CR2 |= SPI_CR2_TXDMAEN;
+}
 

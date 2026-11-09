@@ -38,6 +38,8 @@ uint8_t root_dir_buffer[512];
 uint8_t song_sector_buffer[512];
 uint8_t FAT_sector_buffer[512];
 
+int16_t test_buf[96];
+
 uint32_t fat_start;
 
 uint32_t current_cluster;
@@ -130,38 +132,10 @@ int main(void)
 
 	SPI1_Set_Fast();
 	I2S3_Init();
+	memcpy(test_buf, SINE_TABLE_1KHZ_48K, sizeof(test_buf));
+	Audio_DMA_Start(test_buf, 96);
+	printf("DMA Started\r\n");
 
-	/*
-	for(int i = 0; i < 512 ; i++){
-		tx_buffer[i] = (uint8_t)(i & 0xFF);
-	}
-	memset(rx_buffer, 0, 512);
-
-	if (SD_Write_Single_Block(tx_buffer, 500) != 0){
-		while(1);
-	}
-	if (SD_Read_Single_Block(rx_buffer, 500) != 0){
-		while(1);
-	}
-
-
-	uint16_t errors = 0;
-
-	for(int i = 0 ; i < 512 ; i++){
-		if(tx_buffer[i] != rx_buffer[i]){
-			errors++;
-		}
-	}
-	if(errors > 0){
-		printf("Mismatch between read and written data.\r\n");
-	}
-	else{
-		printf("Data matched! successfully.\r\n");
-	}
-
-
-	printf("Echo test: type something\r\n");
-	*/
 	// 1. read sector 0 from the card into rx_buffer
 	if (SD_Read_Single_Block(rx_buffer, 0) != 0){
 	    while(1);
@@ -250,6 +224,11 @@ int main(void)
 	}
 
 
+	uint32_t counter = 0;
 	while (1){
+		counter++;
+		if (counter % 2000000 == 0){
+			printf("CPU still running: %lu\r\n", counter);
+		}
 	}
 }
