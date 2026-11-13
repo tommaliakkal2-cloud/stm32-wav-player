@@ -12,7 +12,7 @@
 
 # IDE & Eclipse temporary files
 .settings/
-.launch
+*.launch
 .target
 *.log
 
