@@ -169,13 +169,17 @@ void Audio_DMA_Start(int16_t *buf, uint16_t count){
 	// 5. how many 16-bit samples are in the buffer
 	DMA1_Stream5->NDTR = count;
 
-	// 6. settings (written with = so every other bit, including CHSEL, is 0 = channel 0)
-	DMA1_Stream5->CR = DMA_SxCR_DIR_0      // memory -> peripheral
-	                 | DMA_SxCR_MINC       // step through the buffer
-	                 | DMA_SxCR_CIRC       // loop back to the top at the end
-	                 | DMA_SxCR_MSIZE_0    // memory items are 16-bit
-	                 | DMA_SxCR_PSIZE_0    // peripheral items are 16-bit
-	                 | DMA_SxCR_PL_1;      // high priority
+	DMA1_Stream5->CR = DMA_SxCR_DIR_0      // memory -> peripheral (buffer to i2s)
+	                 | DMA_SxCR_MINC       // move along the buffer each time
+	                 | DMA_SxCR_CIRC       // go back to the start when we hit the end
+	                 | DMA_SxCR_MSIZE_0    // our samples are 16 bit
+	                 | DMA_SxCR_PSIZE_0    // and SPI3->DR takes 16 bit too
+	                 | DMA_SxCR_PL_1       // high priority, audio cant wait
+	                 | DMA_SxCR_HTIE       // tell me when first half is done
+	                 | DMA_SxCR_TCIE;      // tell me when second half is done
+
+	DMA1->HIFCR = DMA_HIFCR_CTCIF5 | DMA_HIFCR_CHTIF5 | DMA_HIFCR_CTEIF5| DMA_HIFCR_CDMEIF5 | DMA_HIFCR_CFEIF5;
+	NVIC_EnableIRQ(DMA1_Stream5_IRQn); // let the dma interrupt actually reach the cpu
 
 	// 7. start the stream
 	DMA1_Stream5->CR |= DMA_SxCR_EN;

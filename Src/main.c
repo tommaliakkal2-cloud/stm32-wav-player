@@ -38,7 +38,36 @@ uint8_t root_dir_buffer[512];
 uint8_t song_sector_buffer[512];
 uint8_t FAT_sector_buffer[512];
 
-int16_t test_buf[96];
+#define AUDIO_BUF_SAMPLES 8192                 // 16KB buffer, 8192 x 16bit samples
+#define HALF (AUDIO_BUF_SAMPLES / 2)           // each half is 4096 samples = 16 sectors
+int16_t audio_buf[AUDIO_BUF_SAMPLES];          // the buffer dma keeps looping over
+
+// set inside the interrupt, read in main loop -> needs volatile or compiler ignores changes
+volatile uint8_t refill_first_half = 0;
+volatile uint8_t refill_second_half = 0;
+
+// runs when dma hits the halfway point or the end of audio_buf
+// keep this short!! just set a flag, the actual refilling happens in main
+void DMA1_Stream5_IRQHandler(void){
+	if (DMA1->HISR & DMA_HISR_HTIF5){      // first half finished playing
+		DMA1->HIFCR = DMA_HIFCR_CHTIF5;    // clear flag or this keeps firing forever
+		refill_first_half = 1;
+	}
+	if (DMA1->HISR & DMA_HISR_TCIF5){      // second half finished, dma wraps to the top
+		DMA1->HIFCR = DMA_HIFCR_CTCIF5;
+		refill_second_half = 1;
+	}
+}
+
+// temporary: fills a half with the sine wave, will swap this for song data later
+uint32_t sine_pos = 0;                     // where we are in the sine table (0-95)
+void fill_half(int16_t *dst, uint32_t count){
+	for (uint32_t i = 0; i < count; i++){
+		dst[i] = SINE_TABLE_1KHZ_48K[sine_pos];
+		sine_pos++;
+		if (sine_pos == 96) sine_pos = 0;  // wrap so the wave carries on smoothly
+	}
+}
 
 uint32_t fat_start;
 
@@ -132,8 +161,6 @@ int main(void)
 
 	SPI1_Set_Fast();
 	I2S3_Init();
-	memcpy(test_buf, SINE_TABLE_1KHZ_48K, sizeof(test_buf));
-	Audio_DMA_Start(test_buf, 96);
 	printf("DMA Started\r\n");
 
 	// 1. read sector 0 from the card into rx_buffer
@@ -224,11 +251,28 @@ int main(void)
 	}
 
 
-	uint32_t counter = 0;
+	// start dma AFTER the fat stuff, so the card reading cant hold up the refills
+	fill_half(&audio_buf[0], HALF);        // fill both halves before starting
+	fill_half(&audio_buf[HALF], HALF);
+	Audio_DMA_Start(audio_buf, AUDIO_BUF_SAMPLES);
+	printf("DMA started with two halves\r\n");
+
+	uint32_t refills = 0, next_print = 215; // ~21.5 refills a sec, so print every ~10s
 	while (1){
-		counter++;
-		if (counter % 2000000 == 0){
-			printf("CPU still running: %lu\r\n", counter);
+		if (refill_first_half){            // dma is now playing 2nd half, safe to refill 1st
+			refill_first_half = 0;
+			fill_half(&audio_buf[0], HALF);
+			refills++;
+		}
+		if (refill_second_half){           // dma wrapped back to 1st half, refill 2nd
+			refill_second_half = 0;
+			fill_half(&audio_buf[HALF], HALF);
+			refills++;
+		}
+		if (refills >= next_print){
+			printf("Refills: %lu\r\n", refills);
+			next_print += 215;
 		}
 	}
+
 }
