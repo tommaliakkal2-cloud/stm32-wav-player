@@ -38,7 +38,6 @@ uint8_t SD_Init(void){
 
 	uint8_t response;//to store SD card response
 	uint8_t tries= 0;//to count number of tries of communication
-	printf("Initializing SD Card...\r\n");
 
 //wake up with 80+ pulses with cs high
 	SD_NSS_HIGH();
@@ -48,9 +47,9 @@ uint8_t SD_Init(void){
 	//reset and SPI mode command
 	SD_NSS_LOW();
 	response = SD_SendCommand(CMD0,0,0x95);
-	printf("CMD0 Response : 0x%02X\r\n", response);
+	//printf("CMD0 Response : 0x%02X\r\n", response);
 	if (response != 0x01){
-		printf("Error: CMD0 failed\r\n");
+		printf("Error: CMD0 failed, SD card error, try reset...\r\n");
 		SD_NSS_HIGH();
 		SPI1_Transfer(0XFF);
 		return 1;
@@ -71,10 +70,10 @@ uint8_t SD_Init(void){
 		SD_NSS_HIGH();
 		SPI1_Transfer(0XFF);
 
-		printf("Response is %02X %02X %02X %02X %02X \r\n", response, b1,b2,b3,b4);
+		//printf("Response is %02X %02X %02X %02X %02X \r\n", response, b1,b2,b3,b4);
 	}
 	else{
-		printf("Error: CMD8 failed\r\n");
+		printf("Error: CMD8 failed, try reset...\r\n");
 		SD_NSS_HIGH();
 		SPI1_Transfer(0XFF);
 		return 1;
@@ -95,7 +94,7 @@ uint8_t SD_Init(void){
 	}while((response !=0x00) && tries < 1000);
 
 	if (response == 0x00){
-		printf("SD Card Initialized Succesfully!\r\n");
+		//printf("SD Card Initialized Succesfully!\r\n");
 		SD_NSS_HIGH();
 		SPI1_Transfer(0XFF);
 		return 0;
