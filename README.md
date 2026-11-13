@@ -48,7 +48,7 @@ The audio side (PA4, PC7, PC10, PC12 for I2S3, PB6/PB9 for I2C1, PD4 for the DAC
 1. Format the card as FAT32.
 2. Export each song from Audacity as WAV, signed 16-bit PCM, stereo, 44100 Hz.
 3. Clear all the metadata fields when exporting, so the file has the plain 44-byte header.
-4. Name the files in 8.3 format, e.g. `TRACK01.WAV`, `TRACK02.WAV`, and copy them to the root of the card, one at a time in order.
+4. Name the files in 8.3 format, e.g. `TRACK01.WAV`, `TRACK02.WAV`, etc, and copy them to the root of the card, one at a time in order.
 
 Files in any other format are skipped.
 
