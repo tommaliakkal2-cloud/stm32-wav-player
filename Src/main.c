@@ -59,7 +59,7 @@ void DMA1_Stream5_IRQHandler(void){
 	}
 }
 
-// temporary: fills a half with the sine wave, will swap this for song data later
+/*/ temporary: fills a half with the sine wave, will swap this for song data later
 uint32_t sine_pos = 0;                     // where we are in the sine table (0-95)
 void fill_half(int16_t *dst, uint32_t count){
 	for (uint32_t i = 0; i < count; i++){
@@ -68,9 +68,10 @@ void fill_half(int16_t *dst, uint32_t count){
 		if (sine_pos == 96) sine_pos = 0;  // wrap so the wave carries on smoothly
 	}
 }
-
+*/
 uint32_t fat_start;
-
+uint32_t data_start;          // first sector of the data area, set in main
+uint16_t sectors_per_cluster; // 32 on my card, set in main
 uint32_t current_cluster;
 uint32_t next_cluster;
 
@@ -124,7 +125,71 @@ uint32_t fat_next_cluster(uint32_t cluster){
 	    return read32(&FAT_sector_buffer[sector_pos]) & 0x0FFFFFFF;  // the next cluster is recorded here
 	}
 
+// ---- song reader: hands out the song's audio bytes in order ----
+// hides all the sector/cluster/FAT stuff, the rest of the code just asks for bytes
+uint8_t  stream_buf[512];      // the song sector we are currently reading from
+uint32_t rd_cluster;           // which cluster of the song we're in
+uint32_t rd_sector;            // which sector inside that cluster (0 to 31)
+uint32_t rd_pos;               // where we are inside stream_buf (0 to 511)
+uint32_t rd_bytes_left;        // audio bytes still to go, from the wav header
 
+// point the reader at the start of a song
+void audio_open(uint32_t first_cluster, uint32_t data_offset, uint32_t data_size){
+	rd_cluster = first_cluster;
+	rd_sector = 0;
+	rd_pos = data_offset;          // skip the wav header (44 bytes for my files)
+	rd_bytes_left = data_size;
+	uint32_t lba = data_start + (rd_cluster - 2) * sectors_per_cluster;
+	if (SD_Read_Single_Block(stream_buf, lba) != 0){
+		printf("audio_open: read error\r\n");
+		rd_bytes_left = 0;
+	}
+}
+
+// copy up to n audio bytes into dst, returns how many it actually copied (0 = song over)
+uint32_t audio_read(uint8_t *dst, uint32_t n){
+	uint32_t copied = 0;
+	while (copied < n && rd_bytes_left > 0){
+		if (rd_pos == 512){                         // used up this sector, get the next one
+			rd_pos = 0;
+			rd_sector++;
+			if (rd_sector == sectors_per_cluster){  // used up the whole cluster, ask the FAT
+				rd_sector = 0;
+				rd_cluster = fat_next_cluster(rd_cluster);
+				if (rd_cluster >= 0x0FFFFFF8){      // chain ended early, shouldnt happen
+					rd_bytes_left = 0;
+					break;
+				}
+			}
+			uint32_t lba = data_start + (rd_cluster - 2) * sectors_per_cluster + rd_sector;
+			if (SD_Read_Single_Block(stream_buf, lba) != 0){
+				printf("audio_read: read error\r\n");
+				rd_bytes_left = 0;
+				break;
+			}
+		}
+		uint32_t chunk = 512 - rd_pos;                    // whats left in this sector
+		if (chunk > n - copied) chunk = n - copied;       // dont copy more than asked
+		if (chunk > rd_bytes_left) chunk = rd_bytes_left; // dont go past the end of the audio
+		memcpy(dst + copied, &stream_buf[rd_pos], chunk);
+		rd_pos += chunk;
+		copied += chunk;
+		rd_bytes_left -= chunk;
+	}
+	return copied;
+}
+
+uint8_t silent_halves = 0;     // how many halves we've filled with silence after the song ended
+
+// fill one half of audio_buf with the next bit of the song
+void fill_half(int16_t *dst, uint32_t count){
+	uint32_t want = count * 2;                       // count is samples, audio_read wants bytes
+	uint32_t got = audio_read((uint8_t *)dst, want);
+	if (got < want){                                 // song ran out partway (or completely)
+		memset((uint8_t *)dst + got, 0, want - got); // pad with silence so no junk plays
+		if (got == 0) silent_halves++;
+	}
+}
 
 
 int main(void)
@@ -161,7 +226,6 @@ int main(void)
 
 	SPI1_Set_Fast();
 	I2S3_Init();
-	printf("DMA Started\r\n");
 
 	// 1. read sector 0 from the card into rx_buffer
 	if (SD_Read_Single_Block(rx_buffer, 0) != 0){
@@ -176,7 +240,7 @@ int main(void)
 			    while(1);
 			}
 	uint16_t bytes_per_sector    = read16(&rx_buffer[11]);  //bytes 11-12
-	uint16_t sectors_per_cluster = rx_buffer[13];           //1 byte, no helper needed
+	sectors_per_cluster = rx_buffer[13];           //1 byte, no helper needed
 	uint16_t reserved_sectors    = read16(&rx_buffer[14]);  //bytes 14-15
 	uint16_t num_fats            = rx_buffer[16];           //1 byte
 	uint32_t sectors_per_fats    = read32(&rx_buffer[36]);  //bytes 36-39
@@ -190,7 +254,7 @@ int main(void)
 
 
 	fat_start = part_start + reserved_sectors;
-	uint32_t data_start = fat_start + (num_fats * sectors_per_fats);
+	data_start = fat_start + (num_fats * sectors_per_fats);
 
 	printf("Data Starts @: %lu\r\n", data_start);
 	printf("Root Cluster: %lu\r\n", root_cluster);
@@ -231,15 +295,18 @@ int main(void)
 			printf("Data Size read from cards: %lu\r\n",read32(&card[28]));
 			printf("File size from WAV Header: %lu\r\n",read32(&song_sector_buffer[4]));
 
-			current_cluster = cluster_number;
-			uint32_t count = 0;
-			while(current_cluster < 0x0FFFFFF8){//either not reached end of a chain or no error
+			/*while(current_cluster < 0x0FFFFFF8){//either not reached end of a chain or no error
 				next_cluster = fat_next_cluster(current_cluster);
+
 				count++;
 				current_cluster = next_cluster;
+			}*/
+			if (memcmp(&song_sector_buffer[36], "data", 4) == 0){
+				audio_open(cluster_number, 44, read32(&song_sector_buffer[40]));
+				printf("TRACK01 opened, ready to play\r\n");
+			} else {
+				printf("TRACK01: unsupported layout, re-export it\r\n");
 			}
-			printf("TRACK01 WAV uses %lu clusters\r\n", count);
-
 
 		}
 		/*if (memcmp(card, "TRACK02 WAV", 11) == 0){
@@ -259,6 +326,12 @@ int main(void)
 
 	uint32_t refills = 0, next_print = 215; // ~21.5 refills a sec, so print every ~10s
 	while (1){
+
+		if (silent_halves >= 2){                     // last audio has played, both halves silent
+			DMA1_Stream5->CR &= ~DMA_SxCR_EN;        // stop dma
+			printf("Song finished\r\n");
+			while (1);
+		}
 		if (refill_first_half){            // dma is now playing 2nd half, safe to refill 1st
 			refill_first_half = 0;
 			fill_half(&audio_buf[0], HALF);
@@ -269,10 +342,7 @@ int main(void)
 			fill_half(&audio_buf[HALF], HALF);
 			refills++;
 		}
-		if (refills >= next_print){
-			printf("Refills: %lu\r\n", refills);
-			next_print += 215;
-		}
+
 	}
 
 }
