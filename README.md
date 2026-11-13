@@ -4,7 +4,7 @@ A bare-metal WAV player on the STM32F407 Discovery board. It reads `.wav` files 
 
 No HAL, no FatFs, no libraries: everything is register-level C, including the SD card driver and the FAT32 reader.
 
-> Demo video: *(add link)*
+> Demo video: https://youtu.be/hAH8WI9Yimc
 
 
 ## Features
